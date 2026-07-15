@@ -30,6 +30,9 @@ extension WorkspaceDetailView {
                     .background(TerminalPalette.background)
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            workspaceSurfaceDeck
+        }
         .onChange(of: surface) { _, newSurface in
             if newSurface == .terminal {
                 // The surface stayed mounted under the chrome, so no attach
