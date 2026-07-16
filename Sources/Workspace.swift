@@ -7644,6 +7644,7 @@ final class Workspace: Identifiable, ObservableObject {
     func replaceCloudVMLoadingSurfaceWithTerminal(
         workspaceId: UUID,
         initialCommand: String,
+        remotePTYSessionID: String? = nil,
         focus: Bool = true
     ) -> TerminalPanel? {
         guard workspaceId == id,
@@ -7681,6 +7682,11 @@ final class Workspace: Identifiable, ObservableObject {
         configureNewTerminalPanel(replacementPanel)
         panels[pair.key] = replacementPanel
         panelTitles[pair.key] = replacementPanel.displayTitle
+        if let remotePTYSessionID = normalizedRemotePTYSessionID(remotePTYSessionID) {
+            remotePTYSessionIDsByPanelId[pair.key] = remotePTYSessionID
+            registerRemoteRelayIDAliases(remotePTYSessionID: remotePTYSessionID, restoredPanelId: pair.key)
+            trackRemoteTerminalSurface(pair.key)
+        }
         seedTerminalInheritanceFontPoints(panelId: pair.key, configTemplate: inheritedConfig)
         bonsplitController.updateTab(
             tabId,

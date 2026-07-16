@@ -205,6 +205,17 @@ extension TerminalController {
         ])
     }
 
+    func v2WorkspaceTeamWindowOpen(params _: [String: Any]) -> V2CallResult {
+        let didStart = AppDelegate.shared?.performSharedTeamWindowAction(
+            preferredWindow: nil,
+            debugSource: "rpc.workspace.team_window_open"
+        ) ?? false
+        guard didStart else {
+            return .err(code: "unavailable", message: "Team Window action could not be started", data: nil)
+        }
+        return .ok(["started": true])
+    }
+
     func v2WorkspaceCloudVMTerminalReady(params: [String: Any]) -> V2CallResult {
         guard let tabManager = v2ResolveTabManager(params: params) else {
             return .err(code: "unavailable", message: "TabManager not available", data: nil)
@@ -222,9 +233,11 @@ extension TerminalController {
         }
 
         let focus = v2FocusAllowed(requested: v2Bool(params, "focus") ?? true)
+        let remotePTYSessionID = v2RawString(params, "remote_pty_session_id")
         guard let panel = workspace.replaceCloudVMLoadingSurfaceWithTerminal(
             workspaceId: workspaceId,
             initialCommand: command,
+            remotePTYSessionID: remotePTYSessionID,
             focus: focus
         ) else {
             return .err(

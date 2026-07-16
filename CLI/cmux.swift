@@ -11275,6 +11275,7 @@ struct CMUXCLI {
         let splitStartupCommand = "\(shellQuote(executablePath)) vm-pty-attach --id \(shellQuote(id))"
         var params: [String: Any] = [
             "initial_command": initialStartupCommand,
+            "remote_pty_session_id": endpoint.sessionId,
         ]
         if let workspaceName = workspaceName?.trimmingCharacters(in: .whitespacesAndNewlines),
            !workspaceName.isEmpty {
@@ -11363,6 +11364,7 @@ struct CMUXCLI {
                     params: [
                         "workspace_id": workspaceId,
                         "initial_command": initialStartupCommand,
+                        "remote_pty_session_id": endpoint.sessionId,
                         "focus": true,
                     ]
                 )
@@ -11483,7 +11485,10 @@ struct CMUXCLI {
               !vmID.isEmpty else {
             throw CLIError(message: "Usage: cmux vm-pty-attach --id <vm-id> [--session <session-id>]")
         }
-        let sessionID = try Self.validatedVMSessionIdentifier(sessionIDOpt, flag: "--session")
+        let sessionID = try Self.validatedVMSessionIdentifier(
+            sessionIDOpt ?? ProcessInfo.processInfo.environment["CMUX_REMOTE_PTY_SESSION_ID"],
+            flag: "--session"
+        )
         let attachmentID = try Self.validatedVMSessionIdentifier(attachmentIDOpt, flag: "--attachment")
 
         let startedAt = Date()
