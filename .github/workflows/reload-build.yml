@@ -213,6 +213,34 @@ jobs:
           mkdir -p artifact
           ( cd "$(dirname "$app_path")" && ditto -c -k --sequesterRsrc --keepParent "$(basename "$app_path")" "$GITHUB_WORKSPACE/artifact/simulator-app.zip" )
 
+      - name: Run notification feed UI interaction test
+        if: ${{ inputs.platform == 'ios-simulator' }}
+        env:
+          BUILD_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          runtime_id="$(xcrun simctl list runtimes available -j | python3 -c 'import json,sys; rs=[r for r in json.load(sys.stdin)["runtimes"] if r.get("platform")=="iOS" and r.get("isAvailable", True)]; print(sorted(rs, key=lambda r: tuple(map(int, r.get("version", "0").split("."))))[-1]["identifier"])')"
+          device_type="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; ds=json.load(sys.stdin)["devicetypes"]; matches=[d for d in ds if d["name"]=="iPhone 17 Pro"]; print((matches or [d for d in ds if d["name"].startswith("iPhone")])[-1]["identifier"])')"
+          sim_id="$(xcrun simctl create "cmux-$BUILD_TAG-ui" "$device_type" "$runtime_id")"
+          trap 'xcrun simctl shutdown "$sim_id" >/dev/null 2>&1 || true; xcrun simctl delete "$sim_id" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$sim_id"
+          xcrun simctl bootstatus "$sim_id" -b
+
+          set +e
+          xcodebuild test \
+            -workspace ios/cmux.xcworkspace \
+            -scheme cmux-ios \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$sim_id" \
+            -derivedDataPath "$RUNNER_TEMP/cmux-ios-simulator-dd" \
+            -resultBundlePath "$GITHUB_WORKSPACE/artifact/notification-feed-ui.xcresult" \
+            -only-testing:cmuxUITests/cmuxUITests/testNotificationFeedPreviewSupportsTriageInteractions \
+            2>&1 | tee "$GITHUB_WORKSPACE/artifact/notification-feed-ui.log"
+          test_status=${PIPESTATUS[0]}
+          set -e
+          exit "$test_status"
+
       - name: Write timings.json
         if: ${{ always() }}
         run: |
@@ -243,6 +271,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: reload-${{ inputs.tag }}-${{ inputs.platform }}
