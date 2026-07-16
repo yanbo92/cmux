@@ -49,6 +49,9 @@ jobs:
       - name: Install Zig
         run: ./scripts/install-zig-ci.sh
 
+      - name: Download pre-built GhosttyKit.xcframework
+        run: ./scripts/download-prebuilt-ghosttykit.sh
+
       - name: Build release app
         id: build
         run: |
