@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: blacksmith-6vcpu-macos-26
+    runs-on: macos-15
     timeout-minutes: 60
     env:
       CMUX_SKIP_ZIG_BUILD: "1"
