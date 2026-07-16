@@ -1,4 +1,4 @@
-name: Build cmux PR 4029
+name: Build cmux PR 4029 Release
 
 on:
   workflow_dispatch:
@@ -7,11 +7,6 @@ on:
         description: Exact source commit to build
         required: true
         default: 752dc4a6ae0540720abf261e4838e6c27787a096
-        type: string
-      tag:
-        description: Isolated app tag
-        required: true
-        default: pr-4029
         type: string
 
 permissions:
@@ -54,15 +49,30 @@ jobs:
       - name: Install Zig
         run: ./scripts/install-zig-ci.sh
 
-      - name: Build isolated app
+      - name: Build release app
         id: build
         run: |
           set -euo pipefail
-          log="$RUNNER_TEMP/reload.log"
-          ./scripts/reload.sh --tag "${{ inputs.tag }}" 2>&1 | tee "$log"
-          app_path="$(awk '/^App path:/{getline; sub(/^  /,""); print; exit}' "$log")"
-          test -n "$app_path"
+          xcodebuild -scheme cmux -configuration Release \
+            -derivedDataPath build-release \
+            -destination 'generic/platform=macOS' \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          app_path="$PWD/build-release/Build/Products/Release/cmux.app"
           test -d "$app_path"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")" = "0.64.4"
+
+          curl --fail --location --retry 3 \
+            --output "$RUNNER_TEMP/cmuxd-remote-manifest.json" \
+            https://github.com/manaflow-ai/cmux/releases/download/v0.64.4/cmuxd-remote-manifest.json
+          manifest_json="$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8")), separators=(",", ":")))' "$RUNNER_TEMP/cmuxd-remote-manifest.json")"
+          plutil -remove CMUXRemoteDaemonManifestJSON "$app_path/Contents/Info.plist" >/dev/null 2>&1 || true
+          plutil -insert CMUXRemoteDaemonManifestJSON -string "$manifest_json" "$app_path/Contents/Info.plist"
+          plutil -replace SUFeedURL -string https://github.com/manaflow-ai/cmux/releases/download/v0.64.4/appcast.xml "$app_path/Contents/Info.plist"
+
+          /usr/bin/codesign --force --deep --sign - "$app_path"
           echo "app_path=$app_path" >> "$GITHUB_OUTPUT"
           mkdir -p artifact
           ditto -c -k --sequesterRsrc --keepParent "$app_path" artifact/cmux-pr-4029.app.zip
@@ -71,6 +81,9 @@ jobs:
             echo "app_path=$app_path"
             echo "app_bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
             echo "app_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$app_path/Contents/Info.plist")"
+            echo "update_feed=$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$app_path/Contents/Info.plist")"
+            echo "auth_callback_scheme=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:1:CFBundleURLSchemes:0' "$app_path/Contents/Info.plist")"
+            echo "remote_daemon_manifest_version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["appVersion"])' "$RUNNER_TEMP/cmuxd-remote-manifest.json")"
           } > artifact/build-info.txt
           /usr/bin/codesign --verify --deep --strict --verbose=2 "$app_path"
           /usr/bin/codesign -dvv "$app_path" 2> artifact/codesign.txt || true
