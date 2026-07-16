@@ -1,0 +1,84 @@
+name: Build cmux PR 4029
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact source commit to build
+        required: true
+        default: 752dc4a6ae0540720abf261e4838e6c27787a096
+        type: string
+      tag:
+        description: Isolated app tag
+        required: true
+        default: pr-4029
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 60
+    env:
+      CMUX_SKIP_ZIG_BUILD: "1"
+    steps:
+      - name: Checkout PR source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.source_ref }}
+          submodules: recursive
+
+      - name: Verify source commit
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_ref }}"
+          git submodule status
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode.app/Contents/Developer ]; then
+            xcode_dir=/Applications/Xcode.app/Contents/Developer
+          else
+            xcode_app="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort | tail -n 1)"
+            test -n "$xcode_app"
+            xcode_dir="$xcode_app/Contents/Developer"
+          fi
+          test -d "$xcode_dir"
+          echo "DEVELOPER_DIR=$xcode_dir" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$xcode_dir"
+          xcodebuild -version
+
+      - name: Install Zig
+        run: ./scripts/install-zig-ci.sh
+
+      - name: Build isolated app
+        id: build
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/reload.log"
+          ./scripts/reload.sh --tag "${{ inputs.tag }}" 2>&1 | tee "$log"
+          app_path="$(awk '/^App path:/{getline; sub(/^  /,""); print; exit}' "$log")"
+          test -n "$app_path"
+          test -d "$app_path"
+          echo "app_path=$app_path" >> "$GITHUB_OUTPUT"
+          mkdir -p artifact
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" artifact/cmux-pr-4029.app.zip
+          {
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "app_path=$app_path"
+            echo "app_bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
+            echo "app_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$app_path/Contents/Info.plist")"
+          } > artifact/build-info.txt
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$app_path"
+          /usr/bin/codesign -dvv "$app_path" 2> artifact/codesign.txt || true
+
+      - name: Upload app
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cmux-pr-4029
+          path: artifact/
+          retention-days: 14
+          if-no-files-found: error
