@@ -1,0 +1,7 @@
+Window inspected: 2026-07-15 15:45:00 through 2026-07-15 15:56:00 America/Los_Angeles
+Directory: /Users/lawrence/Library/Logs/DiagnosticReports
+
+Only report in the window:
+2026-07-15 15:47:44 -0700 | 22825 bytes | /Users/lawrence/Library/Logs/DiagnosticReports/swift-frontend-2026-07-15-154744.ips
+
+There is no cmux, cmux DEV, WebKit, or sf7191 crash report in the window. The newest cmux-named crash report is /Users/lawrence/Library/Logs/DiagnosticReports/cmux-2026-07-13-190601.ips, modified 2026-07-13 19:07:16 -0700.

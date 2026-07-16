@@ -1,0 +1,9 @@
+Source command:
+/usr/bin/log show --start '2026-07-15 15:51:30' --end '2026-07-15 15:54:45' --style compact --info --debug --predicate '(eventMessage CONTAINS[c] "sf7191") OR (eventMessage CONTAINS[c] "94955")'
+
+2026-07-15 15:53:00.944 Df WindowServer[424:13df] [com.apple.SkyLight.processes:Lifecycle] 0[outside of RPC]: Process death: 0x0-0x513312e (cmux DEV sf7191) connectionID: 1CDEF3 pid: 94955 in session 0x101
+2026-07-15 15:53:00.971 Df launchd[1:95db672] [gui/501 [100024]:] service inactive: application.com.cmuxterm.app.debug.sf7191.703392142.703393705.301A627B-4D8F-4428-A92A-DE702F1563F2
+2026-07-15 15:53:00.975 Df ControlCenter[833:95f9ff6] [com.apple.runningboard:process] Firing exit handlers for 94955 with context <RBSProcessExitContext| specific, status:<RBSProcessExitStatus| domain:signal(2) code:SIGTERM(15)>>
+2026-07-15 15:53:00.975 Df ControlCenter[833:95edc38] [com.apple.FrontBoard:Process] [app<application.com.cmuxterm.app.debug.sf7191.703392142.703393705.301A627B-4D8F-4428-A92A-DE702F1563F2>:94955] Process exited: <RBSProcessExitContext| specific, status:<RBSProcessExitStatus| domain:signal(2) code:SIGTERM(15)>>.
+2026-07-15 15:54:38.127 Df cmux DEV[80404:961a9a0] [com.apple.runningboard:connection] Identity resolved as app<application.com.cmuxterm.app.debug.sf7191.703392142.703393705(501)>
+2026-07-15 15:54:55.928 Df ControlCenter[833:961ab7f] [com.apple.FrontBoard:Process] [app<application.com.cmuxterm.app.debug.sf7191.703392142.703393705>:80404] Process exited: <RBSProcessExitContext| voluntary>.
