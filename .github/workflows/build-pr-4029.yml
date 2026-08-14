@@ -73,11 +73,16 @@ jobs:
           test -n "$xcode_app"
           xcode_dir="$xcode_app/Contents/Developer"
           echo "DEVELOPER_DIR=$xcode_dir" >> "$GITHUB_ENV"
+          echo "XCODE_APP_PATH=$xcode_app" >> "$GITHUB_ENV"
           export DEVELOPER_DIR="$xcode_dir"
           xcodebuild -version
 
-      - name: Install Zig
-        run: ./scripts/install-zig-ci.sh
+      - name: Free disk space
+        run: |
+          set -euo pipefail
+          df -h /
+          find /Applications -maxdepth 1 -name 'Xcode*.app' ! -path "$XCODE_APP_PATH" -print -exec sudo rm -rf {} + || true
+          df -h /
 
       - name: Download pre-built GhosttyKit.xcframework
         run: ./scripts/download-prebuilt-ghosttykit.sh
@@ -86,13 +91,29 @@ jobs:
         id: build
         run: |
           set -euo pipefail
+          echo "=== runner facts ==="
+          sysctl -n machdep.cpu.brand_string hw.memsize hw.ncpu
+          df -h /
+          set +e
           xcodebuild -scheme cmux -configuration Release \
             -derivedDataPath build-release \
             -destination 'generic/platform=macOS' \
+            -parallelizeTargets NO \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            build 2>&1 | tee xcbuild.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "=== xcodebuild exit code: $rc ==="
+          grep -E "error:|The following build commands failed|BUILD FAILED|BUILD SUCCEEDED" xcbuild.log | tail -n 60 || true
+          if [ "$rc" -ne 0 ]; then
+            echo "=== last 150 lines of xcbuild.log ==="
+            tail -n 150 xcbuild.log || true
+            echo "=== disk after failure ==="
+            df -h /
+            exit "$rc"
+          fi
           app_path="$PWD/build-release/Build/Products/Release/cmux.app"
           test -d "$app_path"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")" = "0.64.22"
