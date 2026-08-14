@@ -6,7 +6,7 @@ on:
       source_ref:
         description: Exact source commit to build
         required: true
-        default: ad4be08f154f76bacc83fefaaaa840ed81208fc4
+        default: d56e9937b8d7a5e669fea67ef668dce4924ef5ae
         type: string
 
 permissions:
