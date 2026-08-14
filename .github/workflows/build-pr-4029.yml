@@ -73,16 +73,8 @@ jobs:
           test -n "$xcode_app"
           xcode_dir="$xcode_app/Contents/Developer"
           echo "DEVELOPER_DIR=$xcode_dir" >> "$GITHUB_ENV"
-          echo "XCODE_APP_PATH=$xcode_app" >> "$GITHUB_ENV"
           export DEVELOPER_DIR="$xcode_dir"
           xcodebuild -version
-
-      - name: Free disk space
-        run: |
-          set -euo pipefail
-          df -h /
-          find /Applications -maxdepth 1 -name 'Xcode*.app' ! -path "$XCODE_APP_PATH" -print -exec sudo rm -rf {} + || true
-          df -h /
 
       - name: Download pre-built GhosttyKit.xcframework
         run: ./scripts/download-prebuilt-ghosttykit.sh
