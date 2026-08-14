@@ -34,14 +34,29 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          if [ -d /Applications/Xcode.app/Contents/Developer ]; then
-            xcode_dir=/Applications/Xcode.app/Contents/Developer
-          else
-            xcode_app="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort | tail -n 1)"
-            test -n "$xcode_app"
-            xcode_dir="$xcode_app/Contents/Developer"
+          pinned_major="$(cut -d. -f1 .xcode-version | tr -d '[:space:]')"
+          echo "Pinned Xcode major: $pinned_major"
+          best_app=""
+          best_ver="0"
+          for app in /Applications/Xcode*.app; do
+            [ -d "$app" ] || continue
+            ver="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" 2>/dev/null | tr -d '[:space:]' || echo 0)"
+            echo "Found: $app ($ver)"
+            case "$ver" in
+              "$pinned_major".*) ;;
+              *) continue ;;
+            esac
+            higher="$(printf '%s\n' "$ver" "$best_ver" | sort -rn | head -1)"
+            if [ "$higher" = "$ver" ]; then
+              best_app="$app"
+              best_ver="$ver"
+            fi
+          done
+          if [ -z "$best_app" ]; then
+            echo "::error::No Xcode $pinned_major.x found on runner (see list above)"
+            exit 1
           fi
-          test -d "$xcode_dir"
+          xcode_dir="$best_app/Contents/Developer"
           echo "DEVELOPER_DIR=$xcode_dir" >> "$GITHUB_ENV"
           export DEVELOPER_DIR="$xcode_dir"
           xcodebuild -version
