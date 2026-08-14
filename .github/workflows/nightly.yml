@@ -1,9 +1,6 @@
 name: Nightly macOS build
 
 on:
-  # Refresh the rolling compilation cache four times daily without publishing.
-  schedule:
-    - cron: "17 */6 * * *"
   # CI/CD pause: keep signed Nightly releases available only when dispatched.
   workflow_dispatch:
     inputs:
