@@ -1478,6 +1478,7 @@ struct TitlebarPaneActionsView: View {
             ForEach(TitlebarPaneActionItem.allCases) { item in
                 TitlebarControlButton(
                     config: config,
+                    foregroundColor: Color(nsColor: titlebarControlForegroundNSColor(opacity: 1.0)),
                     accessibilityIdentifier: item.accessibilityIdentifier,
                     accessibilityLabel: item.title,
                     action: {
