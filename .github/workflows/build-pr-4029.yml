@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       CMUX_SKIP_ZIG_BUILD: "1"
@@ -34,29 +34,44 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          pinned_major="$(cut -d. -f1 .xcode-version | tr -d '[:space:]')"
-          echo "Pinned Xcode major: $pinned_major"
-          best_app=""
-          best_ver="0"
-          for app in /Applications/Xcode*.app; do
-            [ -d "$app" ] || continue
-            ver="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" 2>/dev/null | tr -d '[:space:]' || echo 0)"
-            echo "Found: $app ($ver)"
-            case "$ver" in
-              "$pinned_major".*) ;;
-              *) continue ;;
-            esac
-            higher="$(printf '%s\n' "$ver" "$best_ver" | sort -rn | head -1)"
-            if [ "$higher" = "$ver" ]; then
-              best_app="$app"
-              best_ver="$ver"
-            fi
-          done
-          if [ -z "$best_app" ]; then
-            echo "::error::No Xcode $pinned_major.x found on runner (see list above)"
-            exit 1
-          fi
-          xcode_dir="$best_app/Contents/Developer"
+          selection="$(python3 - <<'EOF'
+          import glob, os, subprocess
+
+          pin = open(".xcode-version").read().strip()
+
+          def key(v):
+              return tuple(int(x) for x in (v.split(".") + ["0", "0"])[:3])
+
+          apps = []
+          for app in sorted(glob.glob("/Applications/Xcode*.app")):
+              pl = os.path.join(app, "Contents", "Info.plist")
+              r = subprocess.run(
+                  ["/usr/libexec/PlistBuddy", "-c", "Print :CFBundleShortVersionString", pl],
+                  capture_output=True, text=True)
+              ver = r.stdout.strip()
+              if not ver:
+                  continue
+              print(f"Found: {app} ({ver})")
+              apps.append((key(ver), app))
+
+          strict = [(k, a) for k, a in apps if k[:2] == key(pin)[:2]]
+          if strict:
+              best = max(strict)
+              print(f"Selected Xcode {pin}.x line: {best[1]}")
+          else:
+              loose = [(k, a) for k, a in apps if k[0] == key(pin)[0]]
+              if not loose:
+                  print(f"::error::No Xcode {pin}.x found on runner (see list above)")
+                  raise SystemExit(1)
+              best = max(loose)
+              print(f"::warning::No Xcode {pin} exact line on runner; falling back to {best[1]}")
+          print(f"XCODE_APP={best[1]}")
+          EOF
+          )"
+          echo "$selection"
+          xcode_app="$(printf '%s\n' "$selection" | sed -n 's/^XCODE_APP=//p')"
+          test -n "$xcode_app"
+          xcode_dir="$xcode_app/Contents/Developer"
           echo "DEVELOPER_DIR=$xcode_dir" >> "$GITHUB_ENV"
           export DEVELOPER_DIR="$xcode_dir"
           xcodebuild -version
